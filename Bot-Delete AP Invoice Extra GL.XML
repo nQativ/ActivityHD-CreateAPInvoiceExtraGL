@@ -1,0 +1,61 @@
+<XML ID="{4AE0010F-B62D-4A27-B137-74F578498072}" Type="Macros">
+	<data Code="Delete AP Invoice Extra GL" ID="{7B9AC816-983F-4DA5-B7E0-AB995BC4EACF}">
+		<Name Value="Delete AP Invoice Extra GL"/>
+		<Description Value="Delete allocations for AP invoice"/>
+		<MacroType Value="Record Loop"/>
+		<EnableResults Value="False"/>
+		<Shortcut/>
+		<RecordType Code="Invoices (Accounts Payable)" ID="{5C0FA2D5-3871-43ED-BC1F-B4DE2E3001B8}"/>
+		<RunFrom Value="Invoices (Accounts Payable)">
+			<item Code="Invoices (Accounts Payable)" ID="{5C0FA2D5-3871-43ED-BC1F-B4DE2E3001B8}" Assigned="True"/>
+		</RunFrom>
+		<Using/>
+		<MacroScript>'Put the invoice in edit mode
+RecordLoop.Data.Edit
+
+objAPInvoiceExtraGL.Last
+objAPInvoiceExtraGL.Prior
+Do Until objAPInvoiceExtraGL.IsEndOfFile
+    objAPInvoiceExtraGL.Delete
+    objAPInvoiceExtraGL.Prior
+Loop
+
+'Save the invoice after making changes
+RecordLoop.Data.Save</MacroScript>
+		<MacroScriptInit>'
+' Delete Extra GL Entries for AP Invoice
+'
+' Macro Type:      Record Loop
+' Enable Results:  unchecked
+' Record Type:     Specific - Invoices (Accounts Payable)
+' Run From:        Invoices (Accounts Payable)
+' Using:           blank
+'
+' How to use:      Select one or more AP Invoices for which you would like to delete
+'                  Extra GL entries. Click the 'Bots' button, and then click 'Delete AP
+'                  Invoice Extra GL' from the list of Bots. The Bot will delete all
+'                  Extra GL lines from the selected AP Invoice(s).
+'
+' Why to use:      You used the companion Bot 'Create AP Invoice Extra GL' with
+'                  undesirable results. Rather than delete the lines one by one, run this
+'                  Bot.
+'
+' See also:        Create AP Invoice Extra GL
+' ----------------------------------------------------------------------------------------
+
+Option Explicit
+
+Dim objAPInvoiceExtraGL:   Set objAPInvoiceExtraGL = RecordLoop.Data.ExtraGL
+</MacroScriptInit>
+		<MacroScriptFinal>Set objAPInvoiceExtraGL = Nothing
+</MacroScriptFinal>
+		<AccessControl Value="All"/>
+		<Permissions/>
+		<Obsolete Value="False"/>
+		<Memo/>
+		<CreateDate Value="2016-11-08T14:12:19.483"/>
+		<CreateUser Value="pjohnston"/>
+		<ReviseDate Value="2016-11-08T14:12:42.070"/>
+		<ReviseUser Value="pjohnston"/>
+	</data>
+</XML>

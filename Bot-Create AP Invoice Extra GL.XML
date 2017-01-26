@@ -1,0 +1,325 @@
+<XML ID="{4AE0010F-B62D-4A27-B137-74F578498072}" Type="Macros">
+	<data Code="Create AP Invoice Extra GL" ID="{C2F6E97E-EDB0-436E-A5DD-72BF58E7E1A8}">
+		<Name Value="Create AP Invoice Extra GL"/>
+		<Description Value="Create allocations for AP invoice"/>
+		<MacroType Value="Record Loop"/>
+		<EnableResults Value="False"/>
+		<Shortcut/>
+		<RecordType Code="Invoices (Accounts Payable)" ID="{5C0FA2D5-3871-43ED-BC1F-B4DE2E3001B8}"/>
+		<RunFrom Value="Invoices (Accounts Payable)">
+			<item Code="Invoices (Accounts Payable)" ID="{5C0FA2D5-3871-43ED-BC1F-B4DE2E3001B8}" Assigned="True"/>
+		</RunFrom>
+		<Using/>
+		<MacroScript>'For Each Field in RecordLoop.Data.Fields
+'    MacroProcess.AddMessage(Field.Name &amp; ": " &amp; Field.Value)
+'Next
+
+objAPInvoiceGLDetails.First
+Do Until objAPInvoiceGLDetails.IsEndOfFile
+    'For Each Field in objAPInvoiceGLDetails.Fields
+    '    MacroProcess.AddMessage(Field.Name &amp; ": " &amp; Field.Value)
+    'Next
+    If objAPInvoiceGLDetails.Fields("LineType").Value = "DI" Then
+        strAcctToCredit = objAPInvoiceGLDetails.Fields("DetailAccount").Value
+        dblAllocAmtTot = objAPInvoiceGLDetails.Fields("DetailDebit").Value
+    End If
+    objAPInvoiceGLDetails.Next
+Loop
+
+MacroProcess.AddMessage("strAcctToCredit: " &amp; strAcctToCredit)
+MacroProcess.AddMessage("dblAllocAmtTot: " &amp; dblAllocAmtTot)
+
+'Prompt for calendar to use (default to 'Month')
+MsgBox "The script will use beginning and/or ending dates from the Calendar you select on the next Find form that appears",, "Select Calendar"
+strParam = "&lt;p&gt;&lt;Lookup Value='Month' /&gt;&lt;/p&gt;"
+strGLCalendar = Company.FindCode("General Ledger", "Calendars", strParam)
+'MacroProcess.AddMessage("strGLCalendar: " &amp; strGLCalendar)
+
+'Prompt for beginning and ending dates of contract
+Dim objShell
+Set objShell = CreateObject("WScript.Shell")
+
+'Run the HTA, passing the input via quoted parameters
+On Error Resume Next
+'Help on Run function
+'https://msdn.microsoft.com/en-us/library/d5fk67ky(v=vs.84).aspx
+objShell.Run dq &amp; strHTAFileNameTemp &amp; dq &amp; sp &amp; _
+             dq &amp; strTempPath &amp; dq, _
+             WINDOW_STYLE, _
+             WAIT_ON_RETURN
+If Err.Number &lt;&gt; 0 Then
+    MacroProcess.AddMessage "Error number: " &amp; Err.Number
+    MacroProcess.AddMessage "Error source: " &amp; Err.Source
+    MacroProcess.AddMessage "Error description" &amp; Err.Description
+    Err.Clear
+End If
+On Error Goto 0
+
+'The HTA needs to write the selected dates to a well-known filename in the temp folder
+Dim objFile
+Set objFile = objFSO.OpenTextFile(strTempPath &amp; "dates.txt", 1)
+Dim Line
+Dim t
+t = 0
+Do Until objFile.AtEndOfStream
+    t = t + 1
+    Select Case t
+        Case 1
+            datAllocBeg = objFile.ReadLine
+        Case 2
+            datAllocEnd = objFile.ReadLine
+        Case Else
+    End Select
+Loop
+Set objFile = Nothing
+
+'Now set using HTA
+'datAllocBeg = DateValue(InputBox("Enter the beginning date of the contract", "Begin Date", Date()))
+datAllocBegBOP = Company.DateExpression(datAllocBeg, "beg of period of calendar " &amp; dq &amp; strGLCalendar &amp; dq)
+datAllocBegEOP = Company.DateExpression(datAllocBeg, "end of period of calendar " &amp; dq &amp; strGLCalendar &amp; dq)
+'Now set using HTA
+'datAllocEnd = DateValue(InputBox("Enter the ending date of the contract", "End Date", DateSerial(Year(datAllocBeg)+1, Month(datAllocBeg), Day(datAllocBeg)-1)))
+datAllocEndBOP = Company.DateExpression(datAllocEnd, "beg of period of calendar " &amp; dq &amp; strGLCalendar &amp; dq)
+datAllocEndEOP = Company.DateExpression(datAllocEnd, "end of period of calendar " &amp; dq &amp; strGLCalendar &amp; dq)
+datAllocEntryBOP = Company.DateExpression(datAllocBeg, "beg of period of calendar " &amp; dq &amp; strGLCalendar &amp; dq)
+datAllocEntryEOP = Company.DateExpression(datAllocBeg, "end of period of calendar " &amp; dq &amp; strGLCalendar &amp; dq)
+
+'MacroProcess.AddMessage("datAllocBeg: " &amp; datAllocBeg)
+'MacroProcess.AddMessage("datAllocEnd: " &amp; datAllocEnd)
+'MacroProcess.AddMessage("datAllocEntryBOP: " &amp; datAllocEntryBOP)
+'MacroProcess.AddMessage("datAllocEntryEOP: " &amp; datAllocEntryEOP)
+'MacroProcess.AddMessage("DateDiff datAllocEntryBOP datAllocBeg (days): " &amp; DateDiff("d", datAllocEntryBOP, datAllocBeg))
+
+'Calculate allocation amounts
+datAllocDateCurrCurr = datAllocEntryEOP  'assumes posting date should be end of period
+p = 0
+Do While DateDiff("d", datAllocEndEOP, datAllocDateCurrCurr) &lt;= 0
+    p = p + 1
+    'MacroProcess.AddMessage("p: " &amp; p)
+    'MacroProcess.AddMessage("datAllocDateCurrCurr before increment: " &amp; datAllocDateCurrCurr)
+    datAllocDateCurrCurr = Company.DateExpression(datAllocDateCurrCurr, "end of +1 period of calendar " &amp; dq &amp; strGLCalendar &amp; dq)
+    'MacroProcess.AddMessage("datAllocDateCurrCurr after increment: " &amp; datAllocDateCurrCurr)
+    'MacroProcess.AddMessage("------------------------------------------------------------")
+Loop
+'MacroProcess.AddMessage("p: " &amp; p)
+
+If DateDiff("d", datAllocEntryBOP, datAllocBeg) &lt;&gt; 0 Then
+    'MacroProcess.AddMessage("need to prorate")
+    dblAllocAmtPer = Round(dblAllocAmtTot / (p - 1), 2)
+    'calculate first month amount
+    intDaysPer = DateDiff("d", datAllocBegBOP, datAllocBegEOP) + 1
+    intDaysExp = DateDiff("d", datAllocBeg, datAllocBegEOP) + 1
+    'MacroProcess.AddMessage("intDaysPer: " &amp; intDaysPer)
+    'MacroProcess.AddMessage("intDaysExp: " &amp; intDaysExp)
+    dblAllocAmtBeg = Round(dblAllocAmtPer * intDaysExp / intDaysPer, 2)
+    'calculate last month amount
+    dblAllocAmtEnd = Round(dblAllocAmtTot - dblAllocAmtBeg - (dblAllocAmtPer * (p - 2)), 2)
+Else
+    'MacroProcess.AddMessage("don't need to prorate, but may need to round")
+    dblAllocAmtPer = Round(dblAllocAmtTot / p, 2)
+    dblAllocAmtBeg = dblAllocAmtPer
+    dblAllocAmtEnd = Round(dblAllocAmtTot - (dblAllocAmtPer * (p - 1)), 2)
+End If
+
+'MacroProcess.AddMessage("dblAllocAmtPer: " &amp; dblAllocAmtPer)
+'MacroProcess.AddMessage("dblAllocAmtBeg: " &amp; dblAllocAmtBeg)
+'MacroProcess.AddMessage("dblAllocAmtEnd: " &amp; dblAllocAmtEnd)
+
+'Prompt for expense account
+'strAcctToDebit = "5310-10-0000-A"
+MsgBox "The account you select on the next Find form that appears will set the account to debit (record the expense)",, "Select Expense Account"
+strAcctToDebit = Company.FindCode("General Ledger", "Chart of Accounts")
+
+'Put the invoice in edit mode
+RecordLoop.Data.Edit
+
+objAPInvoiceExtraGL.Last
+i = 1
+datAllocDateCurr = datAllocBegEOP
+For i = 1 to p
+    'MacroProcess.AddMessage("i: " &amp; i)
+    strDescription = "allocate " &amp; RecordLoop.Data.Fields("APVendor").Value &amp; " - " &amp; RecordLoop.Data.Fields("InvoiceNumber").Value
+    Select Case i
+        Case 1
+            'MacroProcess.AddMessage("Entered case 1")
+            dblAllocAmtCurr = dblAllocAmtBeg
+        Case p
+            'MacroProcess.AddMessage("Entered case p")
+            dblAllocAmtCurr = dblAllocAmtEnd
+            strDescription = "allocate " &amp; RecordLoop.Data.Fields("APVendor").Value &amp; " - " &amp; RecordLoop.Data.Fields("InvoiceNumber").Value &amp; " (final)"
+            datAllocDateCurr = datAllocEnd  'use the last date of the contract period rather than the calendar period end date
+        Case Else
+            'MacroProcess.AddMessage("Entered case Else")
+            dblAllocAmtCurr = dblAllocAmtPer
+    End Select
+    'MacroProcess.AddMessage("dblAllocAmtCurr: " &amp; dblAllocAmtCurr)
+    'MacroProcess.AddMessage("strDescription: " &amp; strDescription)
+    'Line 1
+    'MacroProcess.AddMessage("Line 1")
+    objAPInvoiceExtraGL.Insert
+    objAPInvoiceExtraGL.Fields("GLDate").Value = datAllocDateCurr
+    objAPInvoiceExtraGL.Fields("Account").Value = strAcctToCredit
+    objAPInvoiceExtraGL.Fields("CreditAmount").Value = dblAllocAmtCurr
+    objAPInvoiceExtraGL.Fields("Description").Value = strDescription
+    objAPInvoiceExtraGL.Post
+    objAPInvoiceExtraGL.Prior
+
+    'Line 2
+    'MacroProcess.AddMessage("Line 2")
+    objAPInvoiceExtraGL.Insert
+    objAPInvoiceExtraGL.Fields("GLDate").Value = datAllocDateCurr
+    objAPInvoiceExtraGL.Fields("Account").Value = strAcctToDebit
+    objAPInvoiceExtraGL.Fields("DebitAmount").Value = dblAllocAmtCurr
+    objAPInvoiceExtraGL.Fields("Description").Value = strDescription
+    objAPInvoiceExtraGL.Post
+    objAPInvoiceExtraGL.Prior
+
+    'Prepare for next pass
+    datAllocDateCurr = Company.DateExpression(datAllocDateCurr, "end of +1 period of calendar " &amp; dq &amp; strGLCalendar &amp; dq)
+    'MacroProcess.AddMessage("Next date: " &amp; datAllocDateCurr)
+Next
+
+'Save the invoice after making changes
+RecordLoop.Data.Save
+</MacroScript>
+		<MacroScriptInit>'
+' Create Extra GL Entries for AP Invoice
+'
+' Macro Type:      Record Loop
+' Enable Results:  unchecked
+' Record Type:     Specific - Invoices (Accounts Payable)
+' Run From:        Invoices (Accounts Payable)
+' Using:           blank
+'
+' How to use:      Select one or more AP Invoices for which you would like to create
+'                  Extra GL entries. Click the 'Bots' button, and then click 'Create AP
+'                  Invoice Extra GL' from the list of Bots. The Bot will prompt you for
+'                  several pieces of information:
+'
+'                      GL Calendar            Used to obtain period begin and end dates
+'                      Contract begin date    The date on which the service begins
+'                      Contract end date      The date on which the service ends
+'                      GL Account             The account to debit for the expense
+'                                             allocation entries; the offsetting account
+'                                             is drawn from the original invoice. The Bot
+'                                             assumes there is only one line that was
+'                                             debited on the original invoice (e.g.,
+'                                             'Prepaid Insurance).
+'
+' Why to use:      You receive an invoice for some sort of prepaid service that you need
+'                  to expense across the periods during which you will receive the
+'                  service (e.g., prepaid insurance).
+'
+' See also:        If this Bot creates Extra GL lines that are incorrect or otherwise
+'                  unwanted, run the companion Bot 'Delete AP Invoice Extra GL'. It will
+'                  delete all Extra GL lines from the selected AP Invoice(s).
+' ----------------------------------------------------------------------------------------
+
+Option Explicit
+
+Const MACRO_NAME = "Create AP Invoice Extra GL"
+Const HTA_FILENAME = "datepicker-range.hta"
+Const MOMENT_JS = "moment.js"
+Const PIKADAY_JS = "pikaday.js"
+Const PIKADAY_CSS = "pikaday.css"
+
+' Other useful constants
+Const WINDOW_STYLE = 1
+'1 = Activates and displays a window. If the window is minimized or maximized, the system restores it to its original size and position.
+'3 = Activates the window and displays it as a maximized window.
+'7 = Minimizes the window and activates the next top-level window.
+Const WAIT_ON_RETURN = True
+'MacroProcess.AddMessage "MACRO_NAME: " &amp; MACRO_NAME
+'MacroProcess.AddMessage "HTA_FILENAME: " &amp; HTA_FILENAME
+'MacroProcess.AddMessage "MOMENT_JS: " &amp; MOMENT_JS
+'MacroProcess.AddMessage "PIKADAY_JS: " &amp; PIKADAY_JS
+'MacroProcess.AddMessage "PIKADAY_CSS: " &amp; PIKADAY_CSS
+'MacroProcess.AddMessage "WINDOW_STYLE: " &amp; WINDOW_STYLE
+'MacroProcess.AddMessage "WAIT_ON_RETURN: " &amp; WAIT_ON_RETURN
+
+Const dq = """"
+Const sp = " "
+Const sq = "'"
+
+Dim objAPInvoice:          Set objAPInvoice = Company.AccountsPayable.APInvoice
+Dim objAPInvoiceGLDetails: Set objAPInvoiceGLDetails = RecordLoop.Data.GLDetails
+Dim objAPInvoiceExtraGL:   Set objAPInvoiceExtraGL = RecordLoop.Data.ExtraGL
+Dim objFSO:                Set objFSO = CreateObject("Scripting.FileSystemObject")
+
+Dim Field
+Dim strParam
+Dim strGLCalendar
+Dim datAllocBeg        'Date on which expense begins to be incurred (e.g., beginning date of contract)
+Dim datAllocBegBOP     'Calendar period begin date of period containing datAllocBeg
+Dim datAllocBegEOP     'Calendar period end date of period containing datAllocBeg
+Dim datAllocEnd        'Date on which expense ceases to be incurred (e.g., ending date of contract)
+Dim datAllocEndBOP     'Calendar period begin date of period containing datAllocEnd
+Dim datAllocEndEOP     'Calendar period end date of period containing datAllocEnd
+Dim datAllocEntryBOP   'Calendar period begin date of period containing datAllocBeg
+Dim datAllocEntryEOP   'Calendar period end date of period containing datAllocBeg
+Dim strAcctToCredit    'GL account to credit in allocation entries
+Dim strAcctToDebit     'GL account to debit in allocation entries
+Dim dblAllocAmtTot     'Amount to allocate in total across all allocation entries
+Dim datAllocCurr       'Date to use for current allocation entry
+Dim p                  'Counter (calendar periods)
+Dim dblAllocAmtPer     'Amount to allocate per full calendar period
+Dim dblAllocAmtBeg     'Amount to allocate for beginning partial calendar period
+Dim dblAllocAmtEnd     'Amount to allocate for ending calendar period (partial OR rounded)
+Dim intDaysPer         'Number of days in calendar period, total
+Dim intDaysExp         'Number of days in calendar period for which expense should be recorded
+Dim datAllocDate       'Allocation date to use in a specific set of Extra GL lines
+Dim i
+
+'For Each Field in objAPInvoice.Fields
+'    MacroProcess.AddMessage(Field.Name)
+'Next
+
+'For Each Field in objAPInvoiceExtraGL.Fields
+'    MacroProcess.AddMessage(Field.Name)
+'Next
+
+' Prepare to use attached HTA as temp file
+Dim objMacro
+Set objMacro = Company.Administration.Macro
+objMacro.Locate MACRO_NAME
+
+Dim strHTAFilenameTemp
+strHTAFilenameTemp = objMacro.Attachments.SaveAsTempFile(HTA_FILENAME)
+'MacroProcess.AddMessage "strHTAFilenameTemp: " &amp; strHTAFilenameTemp
+
+Dim strTempPath
+strTempPath = Left(strHTAFilenameTemp, InStrRev(strHTAFilenameTemp, "\"))
+'MacroProcess.AddMessage "strTempPath: " &amp; strTempPath
+
+'MacroProcess.AddMessage "Full path for MOMENT_JS: " &amp; strTempPath &amp; MOMENT_JS
+objMacro.Attachments.SaveAs MOMENT_JS, strTempPath &amp; MOMENT_JS
+
+'MacroProcess.AddMessage "Full path for PIKADAY_JS: " &amp; strTempPath &amp; PIKADAY_JS
+objMacro.Attachments.SaveAs PIKADAY_JS, strTempPath &amp; PIKADAY_JS
+
+'MacroProcess.AddMessage "Full path for PIKADAY_CSS: " &amp; strTempPath &amp; PIKADAY_CSS
+objMacro.Attachments.SaveAs PIKADAY_CSS, strTempPath &amp; PIKADAY_CSS
+</MacroScriptInit>
+		<MacroScriptFinal>Set objAPInvoice = Nothing
+Set objAPInvoiceGLDetails = Nothing
+Set objAPInvoiceExtraGL = Nothing
+</MacroScriptFinal>
+		<AccessControl Value="All"/>
+		<Permissions/>
+		<Obsolete Value="False"/>
+		<CustomData>
+			<Field Name="Sunday" Value="False"/>
+			<Field Name="Monday" Value="False"/>
+			<Field Name="Tuesday" Value="False"/>
+			<Field Name="Wednesday" Value="False"/>
+			<Field Name="Thursday" Value="False"/>
+			<Field Name="Friday" Value="False"/>
+			<Field Name="Saturday" Value="False"/>
+		</CustomData>
+		<Memo/>
+		<CreateDate Value="2016-10-24T11:46:52.583"/>
+		<CreateUser Value="bgilstrap"/>
+		<ReviseDate Value="2016-10-24T11:52:18.730"/>
+		<ReviseUser Value="bgilstrap"/>
+	</data>
+</XML>

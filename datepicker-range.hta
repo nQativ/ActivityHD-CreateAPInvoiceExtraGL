@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--<meta charset="utf-8">-->
+  <!--<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">-->
+  <title>Create Extra GL Allocations</title>
+  <HTA:APPLICATION
+      ID="RangeDatepicker"  <!-- used in Window_OnLoad sub below -->
+    APPLICATIONNAME="Range Datepicker"
+    SCROLL="no"
+    SINGLEINSTANCE="yes"
+    WINDOWSTATE="normal"
+    >
+
+    <link rel="stylesheet" href="pikaday.css">
+    <style>
+      html { margin: 0; padding: 0; }
+      body { font-size: 100%; margin: 0; padding: 1.75em; font-family: 'Helvetica Neue', Arial, sans-serif; }
+
+      h1 { font-size: 1.75em; margin: 0 0 0.6em 0; }
+      h2 { font-size: 1.25em; margin: 0 0 0.6em 0; }
+
+      a { color: #2996cc; }
+      a:hover { text-decoration: none; }
+
+      p { line-height: 1.5em; }
+      .small { color: #666; font-size: 0.875em; }
+      .large { font-size: 1.25em; }
+
+      label {
+      font-weight: bold;
+      }
+
+      input[type="text"] {
+      margin: 0.5em 0 3em 0;
+      padding: 0.5em;
+      }
+
+      button#datepicker-button {
+      margin-bottom: 3em;
+      }
+
+      .flow-element {
+      display: inline-block;
+      margin-right: 3em;
+      vertical-align: top;
+      }
+
+      .flow-element:last-child {
+      margin-right: 0;
+      }
+
+      .flow-element input {
+      margin-top: 0;
+      }
+
+      #container {
+      min-height: 15em;
+      }
+
+      .hidden {
+      display: none;
+      }
+    </style>
+
+    <script src="moment.js"></script>
+
+    <script src="pikaday.js"></script>
+
+</head>
+
+<body>
+  <h1>Create AP Invoice Extra GL Detail</h1>
+  <table>
+      <tr>
+          <td>
+              <label for="datebeg">Begin Date:</label><br>
+              <input type="text" id="datebeg">
+          </td>
+          <td>
+              <label for="dateend">End Date:</label><br>
+              <input type="text" id="dateend">
+          </td>
+      </tr>
+      <tr class="hidden">
+          <td colspan="2">
+              <input type="text" id="ofold" disabled>
+          </td>
+      </tr>
+      <tr>
+          <td colspan="2" align="center">
+              <input type="button" value="Submit" name="submit" onclick="SaveAndClose()">
+          </td>
+      </tr>
+  </table>
+</body>
+
+<script language="vbscript" type="text/vbscript">
+ Sub Window_OnLoad()
+ Dim a
+ a = Split(RangeDatepicker.CommandLine, Chr(34))
+ setFieldValue "ofold", a(3)
+ End Sub
+</script>
+
+<script language="javascript" type="text/javascript">
+ function setFieldValue(field, value) {
+     //alert(field)
+     //alert(value)
+     //document.getElementById("invnum").value="JBG001";
+     document.getElementById(field).value=value;
+ }
+
+ var DateBeg = new Pikaday(
+     {
+         field: document.getElementById('datebeg'),
+         firstDay: 1,
+         minDate: new Date(2000, 0, 1),
+         maxDate: new Date(2020, 12, 31),
+         yearRange: [2000,2020],
+         format: 'YYYY-MM-DD',
+         position: 'bottom left',
+         reposition: false,
+         onSelect: function() {
+             DateEnd.setMinDate(this.getDate());
+             DateEnd.setMoment(moment(this.getDate()).add(1, 'y').subtract(1, 'd'));
+         }
+     });
+
+ var DateEnd = new Pikaday(
+     {
+         field: document.getElementById('dateend'),
+         firstDay: 1,
+         minDate: new Date(2000, 0, 1),
+         maxDate: new Date(2020, 12, 31),
+         yearRange: [2000,2020],
+         format: 'YYYY-MM-DD',
+         position: 'bottom left',
+         reposition: false
+     });
+</script>
+
+<script language="vbscript" type="text/vbscript">
+ Sub SaveAndClose()
+ Dim datBeg, datEnd
+ datBeg = document.getElementById("datebeg").value
+ datEnd = document.getElementById("dateend").value
+ strTempPath = document.getElementById("ofold").value
+ Dim objFSO
+ Set objFSO = CreateObject("Scripting.FileSystemObject")
+ Dim objFile
+ Set objFile = objFSO.OpenTextFile(strTempPath & "dates.txt", 2, True)
+ objFile.WriteLine datBeg
+ objFile.WriteLine datEnd
+ objFile.Close
+ Window.Close
+ End Sub
+</script>
+
+</html>
