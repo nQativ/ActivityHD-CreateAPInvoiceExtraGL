@@ -10,16 +10,21 @@
 			<item Code="Invoices (Accounts Payable)" ID="{5C0FA2D5-3871-43ED-BC1F-B4DE2E3001B8}" Assigned="True"/>
 		</RunFrom>
 		<Using/>
-		<MacroScript>For Each Field in RecordLoop.Data.Fields
-    MacroProcess.AddMessage Field.Name &amp; ": " &amp; Field.Value
-Next
+		<MacroScript>'For Each Field in RecordLoop.Data.Fields
+'    MacroProcess.AddMessage Field.Name &amp; ": " &amp; Field.Value
+'Next
 
+'Get account to credit and total amount to allocate
+'This implementation assumes that there is only one pertinent detail line
+'One detail line is assumed to be the credit to accounts payable; LineType = "AP"
+'The one additional detail line is assumed to be the line item from which to extract
+'the two values (account, amount).
 objAPInvoiceGLDetails.First
 Do Until objAPInvoiceGLDetails.IsEndOfFile
-    For Each Field in objAPInvoiceGLDetails.Fields
-        MacroProcess.AddMessage Field.Name &amp; ": " &amp; Field.Value
-    Next
-    If objAPInvoiceGLDetails.Fields("LineType").Value = "DI" Then
+    'For Each Field in objAPInvoiceGLDetails.Fields
+        'MacroProcess.AddMessage Field.Name &amp; ": " &amp; Field.Value
+    'Next
+    If objAPInvoiceGLDetails.Fields("LineType").Value &lt;&gt; "AP" Then
         strAcctToCredit = objAPInvoiceGLDetails.Fields("DetailAccount").Value
         dblAllocAmtTot = objAPInvoiceGLDetails.Fields("DetailDebit").Value
     End If
@@ -33,7 +38,7 @@ MacroProcess.AddMessage "dblAllocAmtTot: " &amp; dblAllocAmtTot
 MsgBox "The script will use beginning and/or ending dates from the Calendar you select on the next Find form that appears",, "Select Calendar"
 strParam = "&lt;p&gt;&lt;Lookup Value='Month' /&gt;&lt;/p&gt;"
 strGLCalendar = Company.FindCode("General Ledger", "Calendars", strParam)
-MacroProcess.AddMessage "strGLCalendar: " &amp; strGLCalendar
+'MacroProcess.AddMessage "strGLCalendar: " &amp; strGLCalendar
 
 'Prompt for beginning and ending dates of contract
 Dim objShell
@@ -84,49 +89,48 @@ datAllocEndEOP = Company.DateExpression(datAllocEnd, "end of period of calendar 
 datAllocEntryBOP = Company.DateExpression(datAllocBeg, "beg of period of calendar " &amp; dq &amp; strGLCalendar &amp; dq)
 datAllocEntryEOP = Company.DateExpression(datAllocBeg, "end of period of calendar " &amp; dq &amp; strGLCalendar &amp; dq)
 
-MacroProcess.AddMessage "datAllocBeg: " &amp; datAllocBeg
-MacroProcess.AddMessage "datAllocEnd: " &amp; datAllocEnd
-MacroProcess.AddMessage "datAllocEntryBOP: " &amp; datAllocEntryBOP
-MacroProcess.AddMessage "datAllocEntryEOP: " &amp; datAllocEntryEOP
-MacroProcess.AddMessage "DateDiff datAllocEntryBOP datAllocBeg (days): " &amp; DateDiff("d", datAllocEntryBOP, datAllocBeg)
+'MacroProcess.AddMessage "datAllocBeg: " &amp; datAllocBeg
+'MacroProcess.AddMessage "datAllocEnd: " &amp; datAllocEnd
+'MacroProcess.AddMessage "datAllocEntryBOP: " &amp; datAllocEntryBOP
+'MacroProcess.AddMessage "datAllocEntryEOP: " &amp; datAllocEntryEOP
+'MacroProcess.AddMessage "DateDiff datAllocEntryBOP datAllocBeg (days): " &amp; DateDiff("d", datAllocEntryBOP, datAllocBeg)
 
 'Calculate allocation amounts
 datAllocDateCurrCurr = datAllocEntryEOP  'assumes posting date should be end of period
 p = 0
 Do While DateDiff("d", datAllocEndEOP, datAllocDateCurrCurr) &lt;= 0
     p = p + 1
-    MacroProcess.AddMessage "p: " &amp; p
-    MacroProcess.AddMessage "datAllocDateCurrCurr before increment: " &amp; datAllocDateCurrCurr
+    'MacroProcess.AddMessage "p: " &amp; p
+    'MacroProcess.AddMessage "datAllocDateCurrCurr before increment: " &amp; datAllocDateCurrCurr
     datAllocDateCurrCurr = Company.DateExpression(datAllocDateCurrCurr, "end of +1 period of calendar " &amp; dq &amp; strGLCalendar &amp; dq)
-    MacroProcess.AddMessage "datAllocDateCurrCurr after increment: " &amp; datAllocDateCurrCurr
-    MacroProcess.AddMessage "------------------------------------------------------------"
+    'MacroProcess.AddMessage "datAllocDateCurrCurr after increment: " &amp; datAllocDateCurrCurr
+    'MacroProcess.AddMessage "------------------------------------------------------------"
 Loop
-MacroProcess.AddMessage "p: " &amp; p
+'MacroProcess.AddMessage "p: " &amp; p
 
 If DateDiff("d", datAllocEntryBOP, datAllocBeg) &lt;&gt; 0 Then
-    MacroProcess.AddMessage "Need to prorate"
+    'MacroProcess.AddMessage "Need to prorate"
     dblAllocAmtPer = Round(dblAllocAmtTot / (p - 1), 2)
-    'calculate first month amount
+    'MacroProcess.AddMessage "Calculate first month amount"
     intDaysPer = DateDiff("d", datAllocBegBOP, datAllocBegEOP) + 1
     intDaysExp = DateDiff("d", datAllocBeg, datAllocBegEOP) + 1
-    MacroProcess.AddMessage "intDaysPer: " &amp; intDaysPer
-    MacroProcess.AddMessage "intDaysExp: " &amp; intDaysExp
+    'MacroProcess.AddMessage "intDaysPer: " &amp; intDaysPer
+    'MacroProcess.AddMessage "intDaysExp: " &amp; intDaysExp
     dblAllocAmtBeg = Round(dblAllocAmtPer * intDaysExp / intDaysPer, 2)
-    'calculate last month amount
+    'MacroProcess.AddMessage "Calculate last month amount"
     dblAllocAmtEnd = Round(dblAllocAmtTot - dblAllocAmtBeg - (dblAllocAmtPer * (p - 2)), 2)
 Else
-    MacroProcess.AddMessage "don't need to prorate, but may need to round"
+    'MacroProcess.AddMessage "Don't need to prorate, but may need to round"
     dblAllocAmtPer = Round(dblAllocAmtTot / p, 2)
     dblAllocAmtBeg = dblAllocAmtPer
     dblAllocAmtEnd = Round(dblAllocAmtTot - (dblAllocAmtPer * (p - 1)), 2)
 End If
 
-MacroProcess.AddMessage "dblAllocAmtPer: " &amp; dblAllocAmtPer
-MacroProcess.AddMessage "dblAllocAmtBeg: " &amp; dblAllocAmtBeg
-MacroProcess.AddMessage "dblAllocAmtEnd: " &amp; dblAllocAmtEnd
+'MacroProcess.AddMessage "dblAllocAmtPer: " &amp; dblAllocAmtPer
+'MacroProcess.AddMessage "dblAllocAmtBeg: " &amp; dblAllocAmtBeg
+'MacroProcess.AddMessage "dblAllocAmtEnd: " &amp; dblAllocAmtEnd
 
 'Prompt for expense account
-'strAcctToDebit = "5310-10-0000-A"
 MsgBox "The account you select on the next Find form that appears will set the account to debit (record the expense)",, "Select Expense Account"
 strAcctToDebit = Company.FindCode("General Ledger", "Chart of Accounts")
 
@@ -137,25 +141,25 @@ objAPInvoiceExtraGL.Last
 i = 1
 datAllocDateCurr = datAllocBegEOP
 For i = 1 to p
-    MacroProcess.AddMessage "i: " &amp; i
+    'MacroProcess.AddMessage "i: " &amp; i
     strDescription = "allocate " &amp; RecordLoop.Data.Fields("APVendor").Value &amp; " - " &amp; RecordLoop.Data.Fields("InvoiceNumber").Value
     Select Case i
         Case 1
-            MacroProcess.AddMessage "Entered case 1"
+            'MacroProcess.AddMessage "Entered case 1"
             dblAllocAmtCurr = dblAllocAmtBeg
         Case p
-            MacroProcess.AddMessage "Entered case p"
+            'MacroProcess.AddMessage "Entered case p"
             dblAllocAmtCurr = dblAllocAmtEnd
             strDescription = "allocate " &amp; RecordLoop.Data.Fields("APVendor").Value &amp; " - " &amp; RecordLoop.Data.Fields("InvoiceNumber").Value &amp; " (final)"
             datAllocDateCurr = datAllocEnd  'use the last date of the contract period rather than the calendar period end date
         Case Else
-            MacroProcess.AddMessage "Entered case Else"
+            'MacroProcess.AddMessage "Entered case Else"
             dblAllocAmtCurr = dblAllocAmtPer
     End Select
-    MacroProcess.AddMessage "dblAllocAmtCurr: " &amp; dblAllocAmtCurr
-    MacroProcess.AddMessage "strDescription: " &amp; strDescription
+    'MacroProcess.AddMessage "dblAllocAmtCurr: " &amp; dblAllocAmtCurr
+    'MacroProcess.AddMessage "strDescription: " &amp; strDescription
     'Line 1
-    MacroProcess.AddMessage "Line 1"
+    'MacroProcess.AddMessage "Line 1"
     objAPInvoiceExtraGL.Append
     objAPInvoiceExtraGL.Fields("GLDate").Value = datAllocDateCurr
     objAPInvoiceExtraGL.Fields("Account").Value = strAcctToCredit
@@ -165,7 +169,7 @@ For i = 1 to p
     objAPInvoiceExtraGL.Prior
 
     'Line 2
-    MacroProcess.AddMessage "Line 2"
+    'MacroProcess.AddMessage "Line 2"
     objAPInvoiceExtraGL.Append
     objAPInvoiceExtraGL.Fields("GLDate").Value = datAllocDateCurr
     objAPInvoiceExtraGL.Fields("Account").Value = strAcctToDebit
@@ -176,7 +180,7 @@ For i = 1 to p
 
     'Prepare for next pass
     datAllocDateCurr = Company.DateExpression(datAllocDateCurr, "end of +1 period of calendar " &amp; dq &amp; strGLCalendar &amp; dq)
-    MacroProcess.AddMessage "Next date: " &amp; datAllocDateCurr
+    'MacroProcess.AddMessage "Next date: " &amp; datAllocDateCurr
 Next
 
 'Save the invoice after making changes
@@ -229,13 +233,13 @@ Const WINDOW_STYLE = 1
 '3 = Activates the window and displays it as a maximized window.
 '7 = Minimizes the window and activates the next top-level window.
 Const WAIT_ON_RETURN = True
-MacroProcess.AddMessage "MACRO_NAME: " &amp; MACRO_NAME
-MacroProcess.AddMessage "HTA_FILENAME: " &amp; HTA_FILENAME
-MacroProcess.AddMessage "MOMENT_JS: " &amp; MOMENT_JS
-MacroProcess.AddMessage "PIKADAY_JS: " &amp; PIKADAY_JS
-MacroProcess.AddMessage "PIKADAY_CSS: " &amp; PIKADAY_CSS
-MacroProcess.AddMessage "WINDOW_STYLE: " &amp; WINDOW_STYLE
-MacroProcess.AddMessage "WAIT_ON_RETURN: " &amp; WAIT_ON_RETURN
+'MacroProcess.AddMessage "MACRO_NAME: " &amp; MACRO_NAME
+'MacroProcess.AddMessage "HTA_FILENAME: " &amp; HTA_FILENAME
+'MacroProcess.AddMessage "MOMENT_JS: " &amp; MOMENT_JS
+'MacroProcess.AddMessage "PIKADAY_JS: " &amp; PIKADAY_JS
+'MacroProcess.AddMessage "PIKADAY_CSS: " &amp; PIKADAY_CSS
+'MacroProcess.AddMessage "WINDOW_STYLE: " &amp; WINDOW_STYLE
+'MacroProcess.AddMessage "WAIT_ON_RETURN: " &amp; WAIT_ON_RETURN
 
 Const dq = """"
 Const sp = " "
@@ -270,13 +274,13 @@ Dim intDaysExp         'Number of days in calendar period for which expense shou
 Dim datAllocDate       'Allocation date to use in a specific set of Extra GL lines
 Dim i
 
-For Each Field in objAPInvoice.Fields
-    MacroProcess.AddMessage Field.Name
-Next
+'For Each Field in objAPInvoice.Fields
+    'MacroProcess.AddMessage Field.Name
+'Next
 
-For Each Field in objAPInvoiceExtraGL.Fields
-    MacroProcess.AddMessage Field.Name
-Next
+'For Each Field in objAPInvoiceExtraGL.Fields
+    'MacroProcess.AddMessage Field.Name
+'Next
 
 ' Prepare to use attached HTA as temp file
 Dim objMacro
@@ -316,10 +320,10 @@ Set objAPInvoiceExtraGL = Nothing
 			<Field Name="Friday" Value="False"/>
 			<Field Name="Saturday" Value="False"/>
 		</CustomData>
-		<Memo/>
+		<Memo>2017-02-13 Mon -- JBG verified after 6.20 upgrade</Memo>
 		<CreateDate Value="2016-10-24T11:46:52.583"/>
 		<CreateUser Value="bgilstrap"/>
-		<ReviseDate Value="2017-03-16T11:02:46.997"/>
+		<ReviseDate Value="2017-03-16T14:35:43.293"/>
 		<ReviseUser Value="bgilstrap"/>
 	</data>
 </XML>
