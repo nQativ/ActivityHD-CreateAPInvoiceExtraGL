@@ -1,5 +1,5 @@
-<XML ID="{4AE0010F-B62D-4A27-B137-74F578498072}" Type="Macros">
-	<data Code="Delete AP Invoice Extra GL" ID="{7B9AC816-983F-4DA5-B7E0-AB995BC4EACF}">
+<XML ID="{4AE0010F-B62D-4A27-B137-74F578498072}" Type="Bots">
+	<data Code="Delete AP Invoice Extra GL" ID="{99BB3AA4-0B1C-4449-BB8B-FA2D570FEACB}">
 		<Name Value="Delete AP Invoice Extra GL"/>
 		<Description Value="Delete allocations for AP invoice"/>
 		<MacroType Value="Record Loop"/>
@@ -50,12 +50,23 @@ Dim objAPInvoiceExtraGL:   Set objAPInvoiceExtraGL = RecordLoop.Data.ExtraGL
 		<MacroScriptFinal>Set objAPInvoiceExtraGL = Nothing
 </MacroScriptFinal>
 		<AccessControl Value="All"/>
-		<Permissions/>
+		<Permissions Value="Testing JBG">
+			<item Code="Testing JBG" ID="{E10E15B3-246A-4F19-8118-05BE604092A7}" Assigned="True"/>
+		</Permissions>
 		<Obsolete Value="False"/>
+		<CustomData>
+			<Field Name="Sunday" Value="False"/>
+			<Field Name="Monday" Value="False"/>
+			<Field Name="Tuesday" Value="False"/>
+			<Field Name="Wednesday" Value="False"/>
+			<Field Name="Thursday" Value="False"/>
+			<Field Name="Friday" Value="False"/>
+			<Field Name="Saturday" Value="False"/>
+		</CustomData>
 		<Memo/>
-		<CreateDate Value="2016-11-08T14:12:19.483"/>
-		<CreateUser Value="pjohnston"/>
-		<ReviseDate Value="2016-11-08T14:12:42.070"/>
-		<ReviseUser Value="pjohnston"/>
+		<CreateDate Value="2016-09-27T16:59:30.730"/>
+		<CreateUser Value="bgilstrap"/>
+		<ReviseDate Value="2016-09-27T17:11:26.850"/>
+		<ReviseUser Value="bgilstrap"/>
 	</data>
 </XML>
